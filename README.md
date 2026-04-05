@@ -8,30 +8,22 @@ For each file in the source folder, pifbip shows the filename and a preview, the
 
 ## Previews
 
-- **Images** (jpg, png, gif, webp, bmp, etc.) — displayed in the terminal via [chafa](https://hpjansson.org/chafa/) (optional)
+- **Images** (jpg, png, gif, webp, bmp, etc.) — rendered directly in the terminal (kitty, sixel, or Unicode half-blocks)
 - **Text files** (txt, md, csv, json, py, etc.) — first 10 and last 10 lines
 - **Other files** — name, size, and MIME type
 
 ## Requirements
 
-- Python 3.9+
-- [chafa](https://hpjansson.org/chafa/) (optional, for image previews)
+- Rust toolchain (for building)
+- No external dependencies — image rendering and fuzzy matching are built in
 
 ## Installation
 
 ```bash
-pip install .
+cargo build --release
 ```
 
-To install chafa for image previews:
-
-```bash
-# Fedora/RHEL
-sudo dnf install chafa
-
-# Debian/Ubuntu
-sudo apt install chafa
-```
+The binary will be at `target/release/pifbip`. Copy it anywhere on your PATH.
 
 ## Usage
 
@@ -62,8 +54,10 @@ pifbip ~/Downloads ~/Sorted -d 3
 ### Controls
 
 - Type a folder name and press **Enter** to move the file there (created if it doesn't exist)
+- **Tab** to accept the selected autocomplete suggestion
+- **Up/Down** arrows to navigate suggestions
 - Press **Enter** on empty input to skip a file
-- Press **Ctrl+C** to quit at any time
+- Press **Ctrl+C** or **Esc** to quit at any time
 
 ## Demo
 

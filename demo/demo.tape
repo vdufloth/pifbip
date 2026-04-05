@@ -4,25 +4,30 @@ Set Height 600
 Set FontSize 14
 Set Theme "Dracula"
 
+# Build
+Type "cargo build --release 2>&1 | tail -1"
+Enter
+Sleep 2s
+
 # Restore demo files
 Type "./demo/restore.sh"
 Enter
-Sleep 3s
+Sleep 4s
 
 # Show source files
 Type "ls -lR demo/source/"
 Enter
-Sleep 2s
+Sleep 3s
 
 # Show destination (empty)
 Type "ls -lR demo/destination/"
 Enter
-Sleep 2s
+Sleep 5s
 
 # Run pifbip
-Type "pifbip demo/source/ demo/destination/ -d 2"
+Type "./target/release/pifbip demo/source/ demo/destination/ -d 2"
 Enter
-Sleep 2s
+Sleep 3s
 
 # File 1: apples.jpg -> instruments
 Type "instruments"

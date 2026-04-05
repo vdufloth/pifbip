@@ -1,0 +1,13 @@
+[package]
+name = "pifbip"
+version = "0.1.0"
+edition = "2021"
+description = "Put In Folder By Interactive Prompt — fast manual file sorting with preview and autocomplete"
+
+[dependencies]
+clap = { version = "4", features = ["derive"] }
+crossterm = "0.28"
+fuzzy-matcher = "0.3"
+viuer = "0.8"
+image = { version = "0.25", default-features = false, features = ["jpeg", "png", "gif", "webp", "bmp", "tiff", "ico"] }
+mime_guess = "2"
