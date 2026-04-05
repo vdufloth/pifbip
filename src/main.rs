@@ -91,6 +91,9 @@ fn main() {
 
     // Create preview window if windowed mode
     let viewer = if matches!(image_mode, ImageMode::Windowed) {
+        if !preview::has_ffmpeg() {
+            eprintln!("Note: ffmpeg not found, video playback in windowed mode won't work");
+        }
         Some(PreviewWindow::new())
     } else {
         None

@@ -10,6 +10,10 @@ const IMAGE_EXTENSIONS: &[&str] = &[
     "jpg", "jpeg", "png", "gif", "webp", "bmp", "tiff", "tif", "ico",
 ];
 
+const VIDEO_EXTENSIONS: &[&str] = &[
+    "mp4", "mkv", "webm", "avi", "mov", "flv", "wmv",
+];
+
 const TEXT_EXTENSIONS: &[&str] = &[
     "txt", "md", "csv", "log", "json", "xml", "yaml", "yml",
     "html", "css", "js", "py", "sh", "conf", "ini", "toml",
@@ -35,26 +39,85 @@ pub fn has_chafa() -> bool {
         .unwrap_or(false)
 }
 
-pub fn show_preview(filepath: &Path, image_mode: &ImageMode, viewer: Option<&PreviewWindow>) {
+pub fn has_ffmpeg() -> bool {
+    Command::new("ffmpeg")
+        .arg("-version")
+        .output()
+        .map(|o| o.status.success())
+        .unwrap_or(false)
+}
+
+enum FileKind {
+    Image,
+    Video,
+    Text,
+    Other,
+}
+
+fn detect_kind(filepath: &Path) -> FileKind {
     let ext = filepath
         .extension()
         .and_then(|e| e.to_str())
         .unwrap_or("")
         .to_lowercase();
 
+    // Try extension first
     if IMAGE_EXTENSIONS.contains(&ext.as_str()) {
-        preview_image(filepath, image_mode, viewer);
-    } else if TEXT_EXTENSIONS.contains(&ext.as_str()) {
-        preview_text(filepath);
-    } else {
-        preview_other(filepath);
+        return FileKind::Image;
+    }
+    if VIDEO_EXTENSIONS.contains(&ext.as_str()) {
+        return FileKind::Video;
+    }
+    if TEXT_EXTENSIONS.contains(&ext.as_str()) {
+        return FileKind::Text;
+    }
+
+    // If extension is unknown or missing, try magic bytes
+    if let Ok(Some(kind)) = infer::get_from_path(filepath) {
+        let mime = kind.mime_type();
+        if mime.starts_with("image/") {
+            return FileKind::Image;
+        }
+        if mime.starts_with("video/") {
+            return FileKind::Video;
+        }
+        if mime.starts_with("text/") {
+            return FileKind::Text;
+        }
+        return FileKind::Other;
+    }
+
+    FileKind::Other
+}
+
+pub fn show_preview(filepath: &Path, image_mode: &ImageMode, viewer: Option<&PreviewWindow>) {
+    let kind = detect_kind(filepath);
+
+    match kind {
+        FileKind::Image => preview_image(filepath, image_mode, viewer),
+        FileKind::Video => preview_video(filepath, image_mode, viewer),
+        FileKind::Text => {
+            if matches!(image_mode, ImageMode::Windowed) {
+                if let Some(v) = viewer {
+                    v.clear();
+                }
+            }
+            preview_text(filepath);
+        }
+        FileKind::Other => {
+            if matches!(image_mode, ImageMode::Windowed) {
+                if let Some(v) = viewer {
+                    v.clear();
+                }
+            }
+            preview_other(filepath);
+        }
     }
 }
 
 fn preview_image(filepath: &Path, image_mode: &ImageMode, viewer: Option<&PreviewWindow>) {
     let (term_width, term_height) = crossterm::terminal::size().unwrap_or((80, 24));
 
-    // Reserve rows for: header (3), blank (1), prompt+matches below (~13)
     let reserved = 17u16;
     let img_height = if term_height > reserved {
         term_height - reserved
@@ -86,6 +149,22 @@ fn preview_image(filepath: &Path, image_mode: &ImageMode, viewer: Option<&Previe
             if viuer::print_from_file(filepath, &conf).is_err() {
                 preview_other(filepath);
             }
+        }
+    }
+}
+
+fn preview_video(filepath: &Path, image_mode: &ImageMode, viewer: Option<&PreviewWindow>) {
+    match image_mode {
+        ImageMode::Windowed => {
+            if let Some(v) = viewer {
+                v.play_video(filepath);
+                println!("  (video playing in window)");
+            } else {
+                preview_other(filepath);
+            }
+        }
+        _ => {
+            preview_other(filepath);
         }
     }
 }

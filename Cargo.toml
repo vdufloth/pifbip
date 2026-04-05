@@ -11,4 +11,5 @@ fuzzy-matcher = "0.3"
 viuer = "0.8"
 image = { version = "0.25", default-features = false, features = ["jpeg", "png", "gif", "webp", "bmp", "tiff", "ico"] }
 mime_guess = "2"
+infer = "0.19"
 minifb = "0.28"
