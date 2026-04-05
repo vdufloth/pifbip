@@ -32,7 +32,9 @@ fn collect_recursive(dir: &Path, max_depth: u16, current_depth: u16, result: &mu
     }
 }
 
-pub fn get_subdirs(destination: &Path) -> Vec<String> {
+/// Returns subdirs: most recently used first (latest → oldest), then remaining alphabetically.
+/// `recent` vec: index 0 = latest used, index 1 = second latest, etc.
+pub fn get_subdirs(destination: &Path, recent: &[String]) -> Vec<String> {
     let mut dirs: Vec<String> = fs::read_dir(destination)
         .into_iter()
         .flatten()
@@ -40,8 +42,24 @@ pub fn get_subdirs(destination: &Path) -> Vec<String> {
         .filter(|e| e.path().is_dir())
         .filter_map(|e| e.file_name().into_string().ok())
         .collect();
-    dirs.sort();
-    dirs
+    dirs.sort(); // alphabetical base
+
+    // Example: recent = ["sports", "fruits", "instruments"]
+    // Result:  ["sports", "fruits", "instruments", ...remaining alphabetical...]
+    let mut result: Vec<String> = Vec::with_capacity(dirs.len());
+    for r in recent {
+        if let Some(pos) = dirs.iter().position(|d| d == r) {
+            result.push(dirs.remove(pos));
+        }
+    }
+    result.extend(dirs);
+    result
+}
+
+pub fn rename_subdir(destination: &Path, old_name: &str, new_name: &str) -> io::Result<()> {
+    let old_path = destination.join(old_name);
+    let new_path = destination.join(new_name);
+    fs::rename(old_path, new_path)
 }
 
 pub fn resolve_collision(dest_file: &Path) -> PathBuf {

@@ -60,9 +60,15 @@ pifbip ~/Downloads ~/Sorted -d 3
 
 - Type a folder name and press **Enter** to move the file there (created if it doesn't exist)
 - **Tab** to accept the selected autocomplete suggestion
-- **Up/Down** arrows to navigate suggestions
-- Press **Enter** on empty input to skip a file
+- **Up/Down** arrows to navigate suggestions (list uses full terminal height)
+- **Left** arrow to go back to the previous file (undoes the move)
+- **Right** arrow or empty **Enter** to skip a file
+- **Ctrl+R** to rename the selected folder
 - Press **Ctrl+C** or **Esc** to quit at any time
+
+### Smart sorting
+
+Recently used folders appear first in the suggestion list, so folders you're actively sorting into stay at the top.
 
 ## Demo
 

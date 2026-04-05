@@ -115,43 +115,107 @@ fn main() {
 
     let mut moved = 0usize;
     let mut stdout = std::io::stdout();
+    let mut recent_dirs: Vec<String> = Vec::new();
 
-    for (i, filepath) in file_list.iter().enumerate() {
+    // History for undo: tracks what happened to each file
+    // None = skipped or not yet visited, Some(dest_path) = moved to this path
+    let mut history: Vec<Option<PathBuf>> = vec![None; total];
+    let mut i = 0usize;
+
+    while i < total {
+        let filepath = &file_list[i];
+
+        // If the file was already moved (we came back via undo), it's at the history path
+        let current_path = if let Some(ref moved_to) = history[i] {
+            moved_to.clone()
+        } else {
+            filepath.clone()
+        };
+
+        // Skip if file no longer exists (shouldn't happen, but safety)
+        if !current_path.exists() {
+            i += 1;
+            continue;
+        }
+
         // Clear screen
         let _ = execute!(stdout, Clear(ClearType::All), MoveTo(0, 0));
 
-        // Header
-        let filename = filepath.file_name().unwrap_or_default().to_string_lossy();
-        let size = filepath.metadata().map(|m| m.len()).unwrap_or(0);
-        println!("\x1b[1m[{}/{}] {}\x1b[0m", i + 1, total, filename);
+        // Header — always show original filename
+        let original_name = filepath.file_name().unwrap_or_default().to_string_lossy();
+        let size = current_path.metadata().map(|m| m.len()).unwrap_or(0);
+        println!("\x1b[1m[{}/{}] {}\x1b[0m", i + 1, total, original_name);
         println!("Size: {}", format_size(size));
         println!();
 
         // Preview
-        show_preview(filepath, &image_mode, viewer.as_ref());
+        show_preview(&current_path, &image_mode, viewer.as_ref());
         println!();
 
-        // Prompt
-        let existing_dirs = get_subdirs(&destination);
-        match ask_destination(&existing_dirs) {
+        // Hint and prompt
+        println!("\x1b[2mMoved: {}/{}  |  Tab=accept  Up/Down=navigate  Left=undo  Right=skip  Ctrl+R=rename  Esc=quit\x1b[0m", moved, total);
+        let existing_dirs = get_subdirs(&destination, &recent_dirs);
+        match ask_destination(&existing_dirs, &destination) {
             PromptResult::Input(subfolder) => {
+                // If file was previously moved (undo case), move it back from its current location
+                let source = &current_path;
                 let target_dir = destination.join(&subfolder);
                 if let Err(e) = std::fs::create_dir_all(&target_dir) {
                     eprintln!("  Error creating directory: {}", e);
                     continue;
                 }
-                let dest_file = resolve_collision(&target_dir.join(&filename.to_string()));
-                match move_file(filepath, &dest_file) {
+                let original_name = file_list[i].file_name().unwrap_or_default().to_string_lossy().to_string();
+                let dest_file = resolve_collision(&target_dir.join(&original_name));
+                match move_file(source, &dest_file) {
                     Ok(()) => {
-                        moved += 1;
+                        // If this was a re-do of a previously moved file, adjust count
+                        if history[i].is_some() {
+                            // Already counted, don't increment
+                        } else {
+                            moved += 1;
+                        }
+                        history[i] = Some(dest_file.clone());
+                        recent_dirs.retain(|d| d != &subfolder);
+                        recent_dirs.insert(0, subfolder.clone());
                         let dest_name = dest_file.file_name().unwrap_or_default().to_string_lossy();
                         println!("  Moved -> {}/{}", subfolder, dest_name);
                     }
                     Err(e) => eprintln!("  Error moving file: {}", e),
                 }
+                i += 1;
             }
             PromptResult::Skip => {
-                println!("  Skipped.");
+                // If file was previously moved, move it back to origin
+                if let Some(ref moved_path) = history[i] {
+                    let original = &file_list[i];
+                    if let Err(e) = move_file(moved_path, original) {
+                        eprintln!("  Error undoing move: {}", e);
+                    } else {
+                        moved -= 1;
+                        println!("  Undone, file restored to source.");
+                    }
+                    history[i] = None;
+                } else {
+                    println!("  Skipped.");
+                }
+                i += 1;
+            }
+            PromptResult::GoBack => {
+                if i > 0 {
+                    // Go back: undo the previous file's move if it was moved
+                    i -= 1;
+                    if let Some(ref moved_path) = history[i] {
+                        let original = &file_list[i];
+                        if let Err(e) = move_file(moved_path, original) {
+                            eprintln!("  Error undoing move: {}", e);
+                        } else {
+                            moved -= 1;
+                            history[i] = None;
+                        }
+                    }
+                } else {
+                    println!("  Already at the first file.");
+                }
             }
             PromptResult::Interrupted => {
                 break;

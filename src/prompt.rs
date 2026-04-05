@@ -1,4 +1,5 @@
 use std::io::{self, Write};
+use std::path::Path;
 
 use crossterm::{
     cursor,
@@ -10,20 +11,38 @@ use crossterm::{
 use fuzzy_matcher::skim::SkimMatcherV2;
 use fuzzy_matcher::FuzzyMatcher;
 
-const MAX_VISIBLE: usize = 10;
 const PROMPT_LABEL: &str = "Move to folder (empty=skip): ";
+const RENAME_LABEL: &str = "Rename to: ";
 
 pub enum PromptResult {
     Input(String),
     Skip,
+    GoBack,
     Interrupted,
 }
 
-pub fn ask_destination(existing_dirs: &[String]) -> PromptResult {
+/// Compute max visible items based on terminal height.
+/// Reserve rows for: prompt line (1) + possible scroll indicators (2) + safety margin (1).
+fn max_visible() -> usize {
+    let (_, term_h) = terminal::size().unwrap_or((80, 24));
+    // Prompt is near bottom of screen after preview; use remaining rows
+    // We have at least the prompt line, so available = term_h - current cursor row
+    // Since we can't reliably know cursor row, use a fraction of terminal height
+    let available = (term_h as usize).saturating_sub(4);
+    available.max(5) // at least 5 items
+}
+
+pub fn ask_destination(
+    existing_dirs: &[String],
+    destination: &Path,
+) -> PromptResult {
     let mut stdout = io::stdout();
     let matcher = SkimMatcherV2::default();
+    let max_vis = max_visible();
 
-    // Print prompt label BEFORE raw mode so it renders normally
+    // Mutable copy of dirs so renames take effect immediately
+    let mut dirs: Vec<String> = existing_dirs.to_vec();
+
     print!("{}", PROMPT_LABEL);
     let _ = stdout.flush();
 
@@ -34,9 +53,8 @@ pub fn ask_destination(existing_dirs: &[String]) -> PromptResult {
     let mut selected: usize = 0;
     let mut prev_drawn_lines: usize = 0;
 
-    // Initial draw
-    let matches = compute_matches(&matcher, &input, existing_dirs);
-    prev_drawn_lines = draw_relative(&mut stdout, input_col, &input, &matches, selected, prev_drawn_lines);
+    let matches = compute_matches(&matcher, &input, &dirs);
+    prev_drawn_lines = draw_relative(&mut stdout, input_col, &input, &matches, selected, prev_drawn_lines, max_vis);
 
     let result = loop {
         let evt = match event::read() {
@@ -71,13 +89,13 @@ pub fn ask_destination(existing_dirs: &[String]) -> PromptResult {
             Event::Key(KeyEvent {
                 code: KeyCode::Tab, ..
             }) => {
-                let matches = compute_matches(&matcher, &input, existing_dirs);
+                let matches = compute_matches(&matcher, &input, &dirs);
                 if !matches.is_empty() && selected < matches.len() {
                     input = matches[selected].0.clone();
                 }
                 selected = 0;
-                let matches = compute_matches(&matcher, &input, existing_dirs);
-                prev_drawn_lines = draw_relative(&mut stdout, input_col, &input, &matches, selected, prev_drawn_lines);
+                let matches = compute_matches(&matcher, &input, &dirs);
+                prev_drawn_lines = draw_relative(&mut stdout, input_col, &input, &matches, selected, prev_drawn_lines, max_vis);
             }
 
             Event::Key(KeyEvent {
@@ -86,8 +104,8 @@ pub fn ask_destination(existing_dirs: &[String]) -> PromptResult {
             }) => {
                 input.pop();
                 selected = 0;
-                let matches = compute_matches(&matcher, &input, existing_dirs);
-                prev_drawn_lines = draw_relative(&mut stdout, input_col, &input, &matches, selected, prev_drawn_lines);
+                let matches = compute_matches(&matcher, &input, &dirs);
+                prev_drawn_lines = draw_relative(&mut stdout, input_col, &input, &matches, selected, prev_drawn_lines, max_vis);
             }
 
             Event::Key(KeyEvent {
@@ -96,19 +114,68 @@ pub fn ask_destination(existing_dirs: &[String]) -> PromptResult {
                 if selected > 0 {
                     selected -= 1;
                 }
-                let matches = compute_matches(&matcher, &input, existing_dirs);
-                prev_drawn_lines = draw_relative(&mut stdout, input_col, &input, &matches, selected, prev_drawn_lines);
+                let matches = compute_matches(&matcher, &input, &dirs);
+                prev_drawn_lines = draw_relative(&mut stdout, input_col, &input, &matches, selected, prev_drawn_lines, max_vis);
             }
 
             Event::Key(KeyEvent {
                 code: KeyCode::Down,
                 ..
             }) => {
-                let matches = compute_matches(&matcher, &input, existing_dirs);
+                let matches = compute_matches(&matcher, &input, &dirs);
                 if !matches.is_empty() && selected < matches.len() - 1 {
                     selected += 1;
                 }
-                prev_drawn_lines = draw_relative(&mut stdout, input_col, &input, &matches, selected, prev_drawn_lines);
+                prev_drawn_lines = draw_relative(&mut stdout, input_col, &input, &matches, selected, prev_drawn_lines, max_vis);
+            }
+
+            // Left arrow: go back to previous file
+            Event::Key(KeyEvent {
+                code: KeyCode::Left,
+                ..
+            }) => {
+                if input.is_empty() {
+                    break PromptResult::GoBack;
+                }
+            }
+
+            // Right arrow: skip (same as empty Enter)
+            Event::Key(KeyEvent {
+                code: KeyCode::Right,
+                ..
+            }) => {
+                if input.is_empty() {
+                    break PromptResult::Skip;
+                }
+            }
+
+            // Ctrl+R: rename selected folder
+            Event::Key(KeyEvent {
+                code: KeyCode::Char('r'),
+                modifiers: KeyModifiers::CONTROL,
+                ..
+            }) => {
+                let matches = compute_matches(&matcher, &input, &dirs);
+                if !matches.is_empty() && selected < matches.len() {
+                    let old_name = matches[selected].0.clone();
+                    if let Some(new_name) = rename_inline(&mut stdout, &old_name, prev_drawn_lines) {
+                        if !new_name.is_empty() && new_name != old_name {
+                            if let Ok(()) = crate::files::rename_subdir(destination, &old_name, &new_name) {
+                                // Update local dirs list
+                                if let Some(pos) = dirs.iter().position(|d| d == &old_name) {
+                                    dirs[pos] = new_name;
+                                }
+                            }
+                        }
+                    }
+                    // Redraw prompt and matches
+                    let _ = write!(stdout, "\r");
+                    let _ = queue!(stdout, Clear(ClearType::CurrentLine));
+                    let _ = write!(stdout, "{}", PROMPT_LABEL);
+                    selected = 0;
+                    let matches = compute_matches(&matcher, &input, &dirs);
+                    prev_drawn_lines = draw_relative(&mut stdout, input_col, &input, &matches, selected, prev_drawn_lines, max_vis);
+                }
             }
 
             Event::Key(KeyEvent {
@@ -118,15 +185,15 @@ pub fn ask_destination(existing_dirs: &[String]) -> PromptResult {
             }) if !modifiers.contains(KeyModifiers::CONTROL) => {
                 input.push(c);
                 selected = 0;
-                let matches = compute_matches(&matcher, &input, existing_dirs);
-                prev_drawn_lines = draw_relative(&mut stdout, input_col, &input, &matches, selected, prev_drawn_lines);
+                let matches = compute_matches(&matcher, &input, &dirs);
+                prev_drawn_lines = draw_relative(&mut stdout, input_col, &input, &matches, selected, prev_drawn_lines, max_vis);
             }
 
             _ => {}
         }
     };
 
-    // Clean up: move down past drawn lines, clear them, disable raw mode
+    // Clean up
     for _ in 0..prev_drawn_lines {
         let _ = write!(stdout, "\r\n");
         let _ = queue!(stdout, Clear(ClearType::CurrentLine));
@@ -140,14 +207,93 @@ pub fn ask_destination(existing_dirs: &[String]) -> PromptResult {
 
     let _ = terminal::disable_raw_mode();
 
-    // Reprint the prompt with final answer
     match &result {
         PromptResult::Input(s) => println!("{}{}", PROMPT_LABEL, s),
         PromptResult::Skip => println!("{}", PROMPT_LABEL),
+        PromptResult::GoBack => println!("{}← back", PROMPT_LABEL),
         PromptResult::Interrupted => println!(),
     }
 
     result
+}
+
+/// Inline rename: replaces prompt line with "Rename to: old_name", lets user edit, returns new name.
+/// Returns None if cancelled (Esc/Ctrl+C).
+fn rename_inline(
+    stdout: &mut io::Stdout,
+    old_name: &str,
+    prev_drawn_lines: usize,
+) -> Option<String> {
+    // Clear match lines
+    for _ in 0..prev_drawn_lines {
+        let _ = write!(stdout, "\r\n");
+        let _ = queue!(stdout, Clear(ClearType::CurrentLine));
+    }
+    if prev_drawn_lines > 0 {
+        let _ = queue!(stdout, cursor::MoveUp(prev_drawn_lines as u16));
+    }
+
+    // Show rename prompt
+    let _ = write!(stdout, "\r");
+    let _ = queue!(stdout, Clear(ClearType::CurrentLine));
+    let rename_col = RENAME_LABEL.len() as u16;
+    let _ = write!(stdout, "{}", RENAME_LABEL);
+
+    let mut name = old_name.to_string();
+    let _ = write!(stdout, "{}", name);
+    let _ = stdout.flush();
+
+    loop {
+        let evt = match event::read() {
+            Ok(e) => e,
+            Err(_) => return None,
+        };
+
+        match evt {
+            Event::Key(KeyEvent {
+                code: KeyCode::Esc, ..
+            })
+            | Event::Key(KeyEvent {
+                code: KeyCode::Char('c'),
+                modifiers: KeyModifiers::CONTROL,
+                ..
+            }) => {
+                return None;
+            }
+
+            Event::Key(KeyEvent {
+                code: KeyCode::Enter,
+                ..
+            }) => {
+                let trimmed = name.trim().to_string();
+                return Some(trimmed);
+            }
+
+            Event::Key(KeyEvent {
+                code: KeyCode::Backspace,
+                ..
+            }) => {
+                name.pop();
+            }
+
+            Event::Key(KeyEvent {
+                code: KeyCode::Char(c),
+                modifiers,
+                ..
+            }) if !modifiers.contains(KeyModifiers::CONTROL) => {
+                name.push(c);
+            }
+
+            _ => continue,
+        }
+
+        // Redraw rename input
+        let _ = write!(stdout, "\r");
+        let _ = queue!(stdout, cursor::MoveRight(rename_col));
+        let _ = queue!(stdout, Clear(ClearType::UntilNewLine));
+        let _ = write!(stdout, "{}", name);
+        let _ = stdout.flush();
+    }
 }
 
 fn compute_matches(
@@ -172,24 +318,21 @@ fn compute_matches(
     scored
 }
 
-/// Compute the visible window range around the selected index.
-fn visible_window(matches_len: usize, selected: usize) -> (usize, usize) {
-    if matches_len <= MAX_VISIBLE {
+fn visible_window(matches_len: usize, selected: usize, max_vis: usize) -> (usize, usize) {
+    if matches_len <= max_vis {
         return (0, matches_len);
     }
-    let half = MAX_VISIBLE / 2;
+    let half = max_vis / 2;
     let start = if selected < half {
         0
     } else if selected + half >= matches_len {
-        matches_len - MAX_VISIBLE
+        matches_len - max_vis
     } else {
         selected - half
     };
-    (start, start + MAX_VISIBLE)
+    (start, start + max_vis)
 }
 
-/// Draws the input and match list using only relative cursor movements.
-/// Returns the number of lines drawn below the prompt (for cleanup on next redraw).
 fn draw_relative(
     stdout: &mut io::Stdout,
     input_col: u16,
@@ -197,27 +340,25 @@ fn draw_relative(
     matches: &[(String, i64)],
     selected: usize,
     prev_lines: usize,
+    max_vis: usize,
 ) -> usize {
-    let (win_start, win_end) = visible_window(matches.len(), selected);
+    let (win_start, win_end) = visible_window(matches.len(), selected, max_vis);
     let visible = &matches[win_start..win_end];
 
     let has_above = win_start > 0;
     let has_below = win_end < matches.len();
 
-    // Count lines we'll draw: indicator lines + visible items
     let drawn_lines = (if has_above { 1 } else { 0 })
         + visible.len()
         + (if has_below { 1 } else { 0 });
 
     let total_lines = drawn_lines.max(prev_lines);
 
-    // Go to start of input on prompt line
     let _ = write!(stdout, "\r");
     let _ = queue!(stdout, cursor::MoveRight(input_col));
     let _ = queue!(stdout, Clear(ClearType::UntilNewLine));
     let _ = write!(stdout, "{}", input);
 
-    // Draw lines below
     let mut lines_written = 0;
 
     for i in 0..total_lines {
@@ -246,15 +387,12 @@ fn draw_relative(
             let _ = write!(stdout, "  \u{2193} {} more", remaining);
             lines_written += 1;
         }
-        // else: clearing leftover lines from prev_lines
     }
 
-    // Move cursor back up to the prompt line
     if total_lines > 0 {
         let _ = queue!(stdout, cursor::MoveUp(total_lines as u16));
     }
 
-    // Position cursor at end of input
     let _ = write!(stdout, "\r");
     let _ = queue!(stdout, cursor::MoveRight(input_col + input.len() as u16));
 
