@@ -1,16 +1,26 @@
 mod files;
 mod preview;
 mod prompt;
+mod viewer;
 
 use std::path::PathBuf;
 use std::process;
 
-use clap::Parser;
+use clap::{Parser, ValueEnum};
 use crossterm::{execute, terminal::{Clear, ClearType}, cursor::MoveTo};
 
 use files::{collect_files, format_size, get_subdirs, move_file, resolve_collision};
-use preview::show_preview;
+use preview::{show_preview, ImageMode};
 use prompt::{ask_destination, PromptResult};
+use viewer::PreviewWindow;
+
+#[derive(Clone, ValueEnum)]
+enum ImageModeArg {
+    Auto,
+    Chafa,
+    Viuer,
+    Windowed,
+}
 
 #[derive(Parser)]
 #[command(name = "pifbip")]
@@ -25,6 +35,10 @@ struct Args {
     /// How deep to scan source subfolders for files (0=top level only)
     #[arg(short, long, default_value_t = 0)]
     depth: u16,
+
+    /// Image preview mode: auto (chafa if available, else viuer), chafa, viuer, or windowed (GUI preview window)
+    #[arg(long, value_enum, default_value_t = ImageModeArg::Auto)]
+    image_mode: ImageModeArg,
 }
 
 fn main() {
@@ -61,6 +75,27 @@ fn main() {
         process::exit(1);
     }
 
+    let image_mode = match args.image_mode {
+        ImageModeArg::Chafa => ImageMode::Chafa,
+        ImageModeArg::Viuer => ImageMode::Viuer,
+        ImageModeArg::Windowed => ImageMode::Windowed,
+        ImageModeArg::Auto => {
+            if preview::has_chafa() {
+                ImageMode::Chafa
+            } else {
+                eprintln!("Note: chafa not found, using built-in viewer (install chafa for higher quality)");
+                ImageMode::Viuer
+            }
+        }
+    };
+
+    // Create preview window if windowed mode
+    let viewer = if matches!(image_mode, ImageMode::Windowed) {
+        Some(PreviewWindow::new())
+    } else {
+        None
+    };
+
     let file_list = collect_files(&origin, args.depth);
     let total = file_list.len();
 
@@ -90,7 +125,7 @@ fn main() {
         println!();
 
         // Preview
-        show_preview(filepath);
+        show_preview(filepath, &image_mode, viewer.as_ref());
         println!();
 
         // Prompt
@@ -120,6 +155,9 @@ fn main() {
             }
         }
     }
+
+    // viewer is dropped here, closing the preview window
+    drop(viewer);
 
     println!("\nDone. Moved {}/{} files.", moved, total);
 }

@@ -2,7 +2,6 @@ Output demo/demo.gif
 Set Width 1000
 Set Height 600
 Set FontSize 14
-Set Theme "Dracula"
 
 # Build
 Type "cargo build --release 2>&1 | tail -1"
@@ -29,12 +28,12 @@ Type "./target/release/pifbip demo/source/ demo/destination/ -d 2"
 Enter
 Sleep 3s
 
-# File 1: apples.jpg -> instruments
+# File 1: guitar.jpg -> instruments
 Type "instruments"
 Enter
 Sleep 1.5s
 
-# File 2: bananas.jpg -> instruments (autocomplete)
+# File 2: piano.jpg -> instruments (autocomplete)
 Type "instrumen"
 Sleep 1s
 Tab
@@ -42,17 +41,17 @@ Sleep 0.5s
 Enter
 Sleep 1.5s
 
-# File 3: guitar.jpg -> sports
+# File 3: soccer.jpg -> sports
 Type "sports"
 Enter
 Sleep 1.5s
 
-# File 4: piano.jpg -> fruits
+# File 4: apples.jpg -> fruits
 Type "fruits"
 Enter
 Sleep 1.5s
 
-# File 5: soccer.jpg -> fruits
+# File 5: bananas.jpg -> fruits
 Type "fruits"
 Enter
 Sleep 1.5s

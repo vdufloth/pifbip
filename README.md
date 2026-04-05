@@ -6,6 +6,10 @@ For each file in the source folder, pifbip shows the filename and a preview, the
 
 ![demo](demo/demo.gif)
 
+### Windowed mode (full resolution preview)
+
+![windowed demo](demo/windowed-demo.gif)
+
 ## Previews
 
 - **Images** (jpg, png, gif, webp, bmp, etc.) — rendered directly in the terminal (kitty, sixel, or Unicode half-blocks)
@@ -36,6 +40,7 @@ pifbip <source> <destination> [options]
 | Flag | Description |
 |---|---|
 | `-d`, `--depth N` | How many levels deep to scan source subfolders for files. `0` (default) = only top-level files, `1` = include one level of subfolders, etc. |
+| `--image-mode MODE` | Image preview mode: `auto` (default), `chafa`, `viuer`, or `windowed`. `auto` uses chafa if available, otherwise viuer. `windowed` opens a GUI preview window at full resolution. |
 | `-h`, `--help` | Show help message and exit |
 
 ### Examples
