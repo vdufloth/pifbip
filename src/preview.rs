@@ -1,6 +1,6 @@
 use std::fs;
 use std::io::{BufRead, BufReader, Read};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use crate::files::format_size;
@@ -13,6 +13,8 @@ const IMAGE_EXTENSIONS: &[&str] = &[
 const VIDEO_EXTENSIONS: &[&str] = &[
     "mp4", "mkv", "webm", "avi", "mov", "flv", "wmv",
 ];
+
+const PDF_EXTENSIONS: &[&str] = &["pdf"];
 
 const TEXT_EXTENSIONS: &[&str] = &[
     "txt", "md", "csv", "log", "json", "xml", "yaml", "yml",
@@ -47,9 +49,18 @@ pub fn has_ffmpeg() -> bool {
         .unwrap_or(false)
 }
 
+pub fn has_pdftoppm() -> bool {
+    Command::new("pdftoppm")
+        .arg("-v")
+        .output()
+        .map(|o| o.status.success())
+        .unwrap_or(false)
+}
+
 enum FileKind {
     Image,
     Video,
+    Pdf,
     Text,
     Other,
 }
@@ -68,6 +79,9 @@ fn detect_kind(filepath: &Path) -> FileKind {
     if VIDEO_EXTENSIONS.contains(&ext.as_str()) {
         return FileKind::Video;
     }
+    if PDF_EXTENSIONS.contains(&ext.as_str()) {
+        return FileKind::Pdf;
+    }
     if TEXT_EXTENSIONS.contains(&ext.as_str()) {
         return FileKind::Text;
     }
@@ -80,6 +94,9 @@ fn detect_kind(filepath: &Path) -> FileKind {
         }
         if mime.starts_with("video/") {
             return FileKind::Video;
+        }
+        if mime == "application/pdf" {
+            return FileKind::Pdf;
         }
         if mime.starts_with("text/") {
             return FileKind::Text;
@@ -96,6 +113,7 @@ pub fn show_preview(filepath: &Path, image_mode: &ImageMode, viewer: Option<&Pre
     match kind {
         FileKind::Image => preview_image(filepath, image_mode, viewer),
         FileKind::Video => preview_video(filepath, image_mode, viewer),
+        FileKind::Pdf => preview_pdf(filepath, image_mode, viewer),
         FileKind::Text => {
             if matches!(image_mode, ImageMode::Windowed) {
                 if let Some(v) = viewer {
@@ -166,6 +184,36 @@ fn preview_video(filepath: &Path, image_mode: &ImageMode, viewer: Option<&Previe
         _ => {
             preview_other(filepath);
         }
+    }
+}
+
+fn render_pdf_page(filepath: &Path) -> Option<PathBuf> {
+    let prefix = "/tmp/pifbip-pdf";
+    let output = Command::new("pdftoppm")
+        .args(["-png", "-f", "1", "-l", "1", "-r", "150"])
+        .arg(filepath)
+        .arg(prefix)
+        .output();
+
+    match output {
+        Ok(o) if o.status.success() => {
+            let png = PathBuf::from(format!("{}-1.png", prefix));
+            if png.exists() {
+                Some(png)
+            } else {
+                None
+            }
+        }
+        _ => None,
+    }
+}
+
+fn preview_pdf(filepath: &Path, image_mode: &ImageMode, viewer: Option<&PreviewWindow>) {
+    if let Some(png_path) = render_pdf_page(filepath) {
+        preview_image(&png_path, image_mode, viewer);
+        let _ = fs::remove_file(&png_path);
+    } else {
+        preview_other(filepath);
     }
 }
 

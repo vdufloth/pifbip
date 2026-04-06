@@ -41,27 +41,32 @@ Sleep 0.5s
 Enter
 Sleep 1.5s
 
-# File 3: soccer.jpg -> sports
+# File 3: sample-pdf.pdf -> documents
+Type "documents"
+Enter
+Sleep 1.5s
+
+# File 4: soccer.jpg -> sports
 Type "sports"
 Enter
 Sleep 1.5s
 
-# File 4: apples.jpg -> fruits
+# File 5: apples.jpg -> fruits
 Type "fruits"
 Enter
 Sleep 1.5s
 
-# File 5: bananas.jpg -> fruits
+# File 6: bananas.jpg -> fruits
 Type "fruits"
 Enter
 Sleep 1.5s
 
-# File 6: tenis.jpg -> sports
+# File 7: tenis.jpg -> sports
 Type "sports"
 Enter
 Sleep 1.5s
 
-# File 7: text.txt -> skip
+# File 8: text.txt -> skip
 Enter
 Sleep 2s
 

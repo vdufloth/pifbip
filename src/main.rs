@@ -92,7 +92,10 @@ fn main() {
     // Create preview window if windowed mode
     let viewer = if matches!(image_mode, ImageMode::Windowed) {
         if !preview::has_ffmpeg() {
-            eprintln!("Note: ffmpeg not found, video playback in windowed mode won't work");
+            eprintln!("Note: ffmpeg not found, video playback won't work");
+        }
+        if !preview::has_pdftoppm() {
+            eprintln!("Note: pdftoppm not found, PDF preview won't work (install poppler-utils)");
         }
         Some(PreviewWindow::new())
     } else {
