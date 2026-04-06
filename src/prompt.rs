@@ -22,13 +22,11 @@ pub enum PromptResult {
 }
 
 /// Compute max visible items based on terminal height.
-/// Reserve rows for: prompt line (1) + possible scroll indicators (2) + safety margin (1).
+/// Reserve rows for content above suggestions: header (1) + size (1) + blank (1) +
+/// preview (~2) + blank (1) + hint (1) + prompt (1) + scroll indicators (2) = ~10.
 fn max_visible() -> usize {
     let (_, term_h) = terminal::size().unwrap_or((80, 24));
-    // Prompt is near bottom of screen after preview; use remaining rows
-    // We have at least the prompt line, so available = term_h - current cursor row
-    // Since we can't reliably know cursor row, use a fraction of terminal height
-    let available = (term_h as usize).saturating_sub(4);
+    let available = (term_h as usize).saturating_sub(10);
     available.max(5) // at least 5 items
 }
 
