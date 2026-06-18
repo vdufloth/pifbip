@@ -7,7 +7,11 @@ use std::path::PathBuf;
 use std::process;
 
 use clap::{Parser, ValueEnum};
-use crossterm::{execute, terminal::{Clear, ClearType}, cursor::MoveTo};
+use crossterm::{
+    cursor::MoveTo,
+    execute,
+    terminal::{Clear, ClearType},
+};
 
 use files::{collect_files, format_size, get_subdirs, move_file, resolve_collision};
 use preview::{show_preview, ImageMode};
@@ -71,7 +75,10 @@ fn main() {
         process::exit(1);
     }
     if !destination.is_dir() {
-        eprintln!("Error: destination '{}' is not a directory", destination.display());
+        eprintln!(
+            "Error: destination '{}' is not a directory",
+            destination.display()
+        );
         process::exit(1);
     }
 
@@ -151,7 +158,14 @@ fn main() {
         // Header — always show original filename
         let original_name = filepath.file_name().unwrap_or_default().to_string_lossy();
         let size = current_path.metadata().map(|m| m.len()).unwrap_or(0);
-        println!("\x1b[1m[{}/{}] {}\x1b[0m  ({}/{})", i + 1, total, original_name, moved + skipped, total);
+        println!(
+            "\x1b[1m[{}/{}] {}\x1b[0m  ({}/{})",
+            i + 1,
+            total,
+            original_name,
+            moved + skipped,
+            total
+        );
         println!("Size: {}", format_size(size));
         println!();
 
@@ -171,15 +185,24 @@ fn main() {
                     eprintln!("  Error creating directory: {}", e);
                     continue;
                 }
-                let original_name = file_list[i].file_name().unwrap_or_default().to_string_lossy().to_string();
+                let original_name = file_list[i]
+                    .file_name()
+                    .unwrap_or_default()
+                    .to_string_lossy()
+                    .to_string();
                 let dest_file = resolve_collision(&target_dir.join(&original_name));
                 match move_file(source, &dest_file) {
                     Ok(()) => {
                         // Adjust counts based on previous state
                         match &history[i] {
                             Some(Action::Moved(_)) => {} // re-doing, already counted
-                            Some(Action::Skipped) => { skipped -= 1; moved += 1; }
-                            None => { moved += 1; }
+                            Some(Action::Skipped) => {
+                                skipped -= 1;
+                                moved += 1;
+                            }
+                            None => {
+                                moved += 1;
+                            }
                         }
                         history[i] = Some(Action::Moved(dest_file.clone()));
                         recent_dirs.retain(|d| d != &subfolder);
@@ -206,7 +229,9 @@ fn main() {
                 // Count as skipped (adjust if was previously something else)
                 match &history[i] {
                     Some(Action::Skipped) => {} // already counted
-                    _ => { skipped += 1; }
+                    _ => {
+                        skipped += 1;
+                    }
                 }
                 history[i] = Some(Action::Skipped);
                 println!("  Skipped.");
@@ -245,5 +270,8 @@ fn main() {
     // viewer is dropped here, closing the preview window
     drop(viewer);
 
-    println!("\nDone. Moved: {}, Skipped: {}, Total: {}", moved, skipped, total);
+    println!(
+        "\nDone. Moved: {}, Skipped: {}, Total: {}",
+        moved, skipped, total
+    );
 }
