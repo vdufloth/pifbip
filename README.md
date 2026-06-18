@@ -4,6 +4,11 @@ Fast bulk file sorting when there's no pattern and you need to decide manually.
 
 For each file in the source folder, pifbip shows the filename and a preview, then prompts you to type a destination subfolder. As you type, existing folder names appear as fuzzy autocomplete suggestions. The file is moved instantly and the next one loads.
 
+pifbip ships as two front-ends over a shared core (`pifbip-core`):
+
+- **`pifbip-cli`** — the terminal experience shown below.
+- **`pifbip-gui`** — a dark-themed desktop window (built with [iced](https://iced.rs)): a file list and destination input with fuzzy autocomplete on the left, and a live preview of images, video, PDFs, and text on the right.
+
 ![demo](demo/demo.gif)
 
 ### Windowed mode (full resolution preview)
@@ -27,12 +32,14 @@ For each file in the source folder, pifbip shows the filename and a preview, the
 cargo build --release
 ```
 
-The binary will be at `target/release/pifbip`. Copy it anywhere on your PATH.
+This produces both binaries: `target/release/pifbip-cli` and `target/release/pifbip-gui`. Copy either anywhere on your PATH.
 
 ## Usage
 
+### CLI
+
 ```bash
-pifbip <source> <destination> [options]
+pifbip-cli <source> <destination> [options]
 ```
 
 ### Options
@@ -47,13 +54,13 @@ pifbip <source> <destination> [options]
 
 ```bash
 # Sort files from Downloads into organized folders
-pifbip ~/Downloads ~/Sorted
+pifbip-cli ~/Downloads ~/Sorted
 
 # Include files from subfolders one level deep
-pifbip ~/Downloads ~/Sorted -d 1
+pifbip-cli ~/Downloads ~/Sorted -d 1
 
 # Scan all nested subfolders up to 3 levels
-pifbip ~/Downloads ~/Sorted -d 3
+pifbip-cli ~/Downloads ~/Sorted -d 3
 ```
 
 ### Controls
@@ -69,6 +76,18 @@ pifbip ~/Downloads ~/Sorted -d 3
 ### Smart sorting
 
 Recently used folders appear first in the suggestion list, so folders you're actively sorting into stay at the top.
+
+### GUI
+
+```bash
+# Launch and pick folders in the window
+pifbip-gui
+
+# …or pre-fill the source/destination from the command line
+pifbip-gui ~/Downloads ~/Sorted -d 2
+```
+
+On launch the GUI shows a setup screen with two folder fields (paste a full path or click **Browse…**) and a scan-depth field. After **Start sorting**, the left panel lists the files and a text input offers the same fuzzy autocomplete as the CLI; the right panel previews the current file (image, video, PDF first page, or text). Use the **Move**, **Skip**, and **Back** buttons, or **Enter** to move, **Tab** to accept a suggestion, and **↑/↓** to navigate suggestions.
 
 ## Testing
 
