@@ -8,6 +8,7 @@ on:
 jobs:
   validate:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     steps:
       - name: Checkout
@@ -22,7 +23,12 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: Install preview dependencies
-        run: sudo apt-get update && sudo apt-get install -y chafa poppler-utils
+        timeout-minutes: 5
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: |
+          sudo apt-get update -o DPkg::Lock::Timeout=120
+          sudo apt-get install -y -o DPkg::Lock::Timeout=120 chafa poppler-utils
 
       - name: Check formatting
         run: cargo fmt --check
