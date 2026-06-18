@@ -10,16 +10,13 @@ const IMAGE_EXTENSIONS: &[&str] = &[
     "jpg", "jpeg", "png", "gif", "webp", "bmp", "tiff", "tif", "ico",
 ];
 
-const VIDEO_EXTENSIONS: &[&str] = &[
-    "mp4", "mkv", "webm", "avi", "mov", "flv", "wmv",
-];
+const VIDEO_EXTENSIONS: &[&str] = &["mp4", "mkv", "webm", "avi", "mov", "flv", "wmv"];
 
 const PDF_EXTENSIONS: &[&str] = &["pdf"];
 
 const TEXT_EXTENSIONS: &[&str] = &[
-    "txt", "md", "csv", "log", "json", "xml", "yaml", "yml",
-    "html", "css", "js", "py", "sh", "conf", "ini", "toml",
-    "rs", "go", "java", "c", "cpp", "h", "hpp", "rb", "php",
+    "txt", "md", "csv", "log", "json", "xml", "yaml", "yml", "html", "css", "js", "py", "sh",
+    "conf", "ini", "toml", "rs", "go", "java", "c", "cpp", "h", "hpp", "rb", "php",
 ];
 
 const HEAD_LINES: usize = 10;

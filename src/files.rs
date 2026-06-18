@@ -41,6 +41,7 @@ pub fn get_subdirs(destination: &Path, recent: &[String]) -> Vec<String> {
         .flatten()
         .filter(|e| e.path().is_dir())
         .filter_map(|e| e.file_name().into_string().ok())
+        .filter(|name| !name.starts_with('.'))
         .collect();
     dirs.sort(); // alphabetical base
 
@@ -116,4 +117,114 @@ pub fn format_size(size: u64) -> String {
         size /= 1024.0;
     }
     format!("{:.1} TB", size)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    struct TestDir {
+        path: PathBuf,
+    }
+
+    impl TestDir {
+        fn new(name: &str) -> Self {
+            let unique = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos();
+            let path =
+                std::env::temp_dir().join(format!("pifbip-{name}-{}-{unique}", std::process::id()));
+            fs::create_dir_all(&path).unwrap();
+            Self { path }
+        }
+
+        fn path(&self) -> &Path {
+            &self.path
+        }
+    }
+
+    impl Drop for TestDir {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.path);
+        }
+    }
+
+    fn write_file(path: &Path) {
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent).unwrap();
+        }
+        fs::write(path, b"test").unwrap();
+    }
+
+    fn rel_paths(root: &Path, files: Vec<PathBuf>) -> Vec<String> {
+        files
+            .into_iter()
+            .map(|p| {
+                p.strip_prefix(root)
+                    .unwrap()
+                    .to_string_lossy()
+                    .replace('\\', "/")
+            })
+            .collect()
+    }
+
+    #[test]
+    fn collect_files_respects_depth_and_ignores_hidden_entries() {
+        let tmp = TestDir::new("collect-files");
+        let root = tmp.path();
+
+        write_file(&root.join("top.txt"));
+        write_file(&root.join(".hidden.txt"));
+        write_file(&root.join("sub/one.txt"));
+        write_file(&root.join("sub/deeper/two.txt"));
+        write_file(&root.join(".hidden-dir/secret.txt"));
+
+        assert_eq!(rel_paths(root, collect_files(root, 0)), vec!["top.txt"]);
+        assert_eq!(
+            rel_paths(root, collect_files(root, 1)),
+            vec!["sub/one.txt", "top.txt"]
+        );
+        assert_eq!(
+            rel_paths(root, collect_files(root, 2)),
+            vec!["sub/deeper/two.txt", "sub/one.txt", "top.txt"]
+        );
+    }
+
+    #[test]
+    fn get_subdirs_prioritizes_recent_dirs_then_remaining_alphabetically() {
+        let tmp = TestDir::new("get-subdirs");
+        let root = tmp.path();
+
+        fs::create_dir_all(root.join("documents")).unwrap();
+        fs::create_dir_all(root.join("fruits")).unwrap();
+        fs::create_dir_all(root.join("instruments")).unwrap();
+        fs::create_dir_all(root.join("sports")).unwrap();
+        fs::create_dir_all(root.join(".hidden")).unwrap();
+
+        let recent = vec![
+            "sports".to_string(),
+            "fruits".to_string(),
+            "missing".to_string(),
+        ];
+        assert_eq!(
+            get_subdirs(root, &recent),
+            vec!["sports", "fruits", "documents", "instruments"]
+        );
+    }
+
+    #[test]
+    fn resolve_collision_adds_incrementing_suffix_before_extension() {
+        let tmp = TestDir::new("resolve-collision");
+        let root = tmp.path();
+
+        write_file(&root.join("report.txt"));
+        write_file(&root.join("report_1.txt"));
+
+        assert_eq!(
+            resolve_collision(&root.join("report.txt")),
+            root.join("report_2.txt")
+        );
+    }
 }

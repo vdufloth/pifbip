@@ -36,7 +36,9 @@ impl PreviewWindow {
         };
 
         let buffer = image_to_buffer(&img);
-        let _ = self.tx.send(ViewerMsg::Show(buffer, WINDOW_WIDTH, WINDOW_HEIGHT));
+        let _ = self
+            .tx
+            .send(ViewerMsg::Show(buffer, WINDOW_WIDTH, WINDOW_HEIGHT));
     }
 
     pub fn play_video(&self, filepath: &Path) {
@@ -92,11 +94,16 @@ fn kill_ffmpeg(proc: &mut Option<Child>) {
 fn spawn_ffmpeg(path: &Path) -> Option<Child> {
     Command::new("ffmpeg")
         .args([
-            "-i", &path.to_string_lossy(),
-            "-f", "rawvideo",
-            "-pix_fmt", "rgb24",
-            "-s", &format!("{}x{}", WINDOW_WIDTH, WINDOW_HEIGHT),
-            "-v", "quiet",
+            "-i",
+            &path.to_string_lossy(),
+            "-f",
+            "rawvideo",
+            "-pix_fmt",
+            "rgb24",
+            "-s",
+            &format!("{}x{}", WINDOW_WIDTH, WINDOW_HEIGHT),
+            "-v",
+            "quiet",
             "-",
         ])
         .stdin(Stdio::null())

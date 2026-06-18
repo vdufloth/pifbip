@@ -3,3 +3,6 @@
 
 # Demo generated files
 demo/demo.gif
+
+# Claude Code local worktrees / settings
+.claude/
