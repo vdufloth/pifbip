@@ -74,7 +74,10 @@ fn main() {
         process::exit(1);
     }
     if !destination.is_dir() {
-        eprintln!("Error: destination '{}' is not a directory", destination.display());
+        eprintln!(
+            "Error: destination '{}' is not a directory",
+            destination.display()
+        );
         process::exit(1);
     }
 
@@ -160,7 +163,10 @@ fn main() {
         let dest = session.destination().to_path_buf();
         match ask_destination(&existing_dirs, &dest) {
             PromptResult::Input(subfolder) => match session.move_to(&subfolder) {
-                Outcome::Moved { subfolder, dest_name } => {
+                Outcome::Moved {
+                    subfolder,
+                    dest_name,
+                } => {
                     println!("  Moved -> {}/{}", subfolder, dest_name);
                 }
                 Outcome::MoveError(e) => eprintln!("  Error {}", e),

@@ -31,7 +31,10 @@ pub struct Progress {
 /// Result of a mutating call, for the front-end to report.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Outcome {
-    Moved { subfolder: String, dest_name: String },
+    Moved {
+        subfolder: String,
+        dest_name: String,
+    },
     Skipped,
     Undone,
     MoveError(String),
@@ -108,13 +111,34 @@ impl SortSession {
 
     /// Original filename of the current file (for headers/list display).
     pub fn current_original_name(&self) -> Option<String> {
-        self.file_list
-            .get(self.index)
-            .map(|p| p.file_name().unwrap_or_default().to_string_lossy().to_string())
+        self.file_list.get(self.index).map(|p| {
+            p.file_name()
+                .unwrap_or_default()
+                .to_string_lossy()
+                .to_string()
+        })
     }
 
     pub fn current_kind(&self) -> Option<FileKind> {
         self.current().map(|p| detect_kind(&p))
+    }
+
+    /// Index of the file currently being decided.
+    pub fn index(&self) -> usize {
+        self.index
+    }
+
+    /// Original file names in listing order (for a GUI file list).
+    pub fn file_names(&self) -> Vec<String> {
+        self.file_list
+            .iter()
+            .map(|p| {
+                p.file_name()
+                    .unwrap_or_default()
+                    .to_string_lossy()
+                    .to_string()
+            })
+            .collect()
     }
 
     /// Full list of destination subfolders: most recently used first, then
@@ -383,6 +407,9 @@ mod tests {
 
         s.move_to("gamma");
         // Most recently used folder should lead the listing.
-        assert_eq!(s.subdir_listing().first().map(String::as_str), Some("gamma"));
+        assert_eq!(
+            s.subdir_listing().first().map(String::as_str),
+            Some("gamma")
+        );
     }
 }
