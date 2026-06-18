@@ -39,7 +39,9 @@ impl PreviewWindow {
         };
 
         let buffer = image_to_buffer(&img);
-        let _ = self.tx.send(ViewerMsg::Show(buffer, WINDOW_WIDTH, WINDOW_HEIGHT));
+        let _ = self
+            .tx
+            .send(ViewerMsg::Show(buffer, WINDOW_WIDTH, WINDOW_HEIGHT));
     }
 
     pub fn play_video(&self, filepath: &Path) {

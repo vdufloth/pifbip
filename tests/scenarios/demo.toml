@@ -1,0 +1,75 @@
+name = "demo"
+setup = "./demo/restore.sh"
+workspace_copy = [
+  "demo/source",
+  "demo/destination",
+  "demo/restore.sh",
+]
+source_root = "demo/source"
+destination_root = "demo/destination"
+binary_args = ["demo/source", "demo/destination", "-d", "2"]
+prompt = "Move to folder (empty=skip):"
+startup = "8 files to sort. Press Ctrl+C to quit."
+summary = "Done. Moved: 7, Skipped: 1, Total: 8"
+timeout_seconds = 20
+pty_cols = 120
+pty_rows = 40
+
+initial_source_files = [
+  "guitar.jpg",
+  "piano.jpg",
+  "sample-pdf.pdf",
+  "soccer.jpg",
+  "subfoldersource/apples.jpg",
+  "subfoldersource/bananas.jpg",
+  "tenis.jpg",
+  "text.txt",
+]
+
+initial_destination_files = []
+
+final_source_files = [
+  "text.txt",
+]
+
+final_destination_files = [
+  "documents/sample-pdf.pdf",
+  "fruits/apples.jpg",
+  "fruits/bananas.jpg",
+  "instruments/guitar.jpg",
+  "instruments/piano.jpg",
+  "sports/soccer.jpg",
+  "sports/tenis.jpg",
+]
+
+[[steps]]
+file = "guitar.jpg"
+keys = ["text:instruments", "enter"]
+
+[[steps]]
+file = "piano.jpg"
+keys = ["text:instrumen", "tab", "enter"]
+
+[[steps]]
+file = "sample-pdf.pdf"
+keys = ["text:documents", "enter"]
+
+[[steps]]
+file = "soccer.jpg"
+keys = ["text:sports", "enter"]
+
+[[steps]]
+file = "apples.jpg"
+keys = ["text:fruits", "enter"]
+
+[[steps]]
+file = "bananas.jpg"
+keys = ["text:fruits", "enter"]
+
+[[steps]]
+file = "tenis.jpg"
+keys = ["text:sports", "enter"]
+
+[[steps]]
+file = "text.txt"
+keys = ["enter"]

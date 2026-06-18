@@ -70,6 +70,15 @@ pifbip ~/Downloads ~/Sorted -d 3
 
 Recently used folders appear first in the suggestion list, so folders you're actively sorting into stay at the top.
 
+## Testing
+
+```bash
+cargo test
+```
+
+This runs both the Rust unit tests and an end-to-end interactive CLI scenario defined in `tests/scenarios/demo.toml`.
+The `demo/demo.tape` file remains the recorded demo script for VHS.
+
 ## Demo
 
 A `demo/` folder is included with sample source files. After sorting, run the restore script to reset:

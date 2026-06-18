@@ -30,10 +30,7 @@ fn max_visible() -> usize {
     available.max(5) // at least 5 items
 }
 
-pub fn ask_destination(
-    existing_dirs: &[String],
-    destination: &Path,
-) -> PromptResult {
+pub fn ask_destination(existing_dirs: &[String], destination: &Path) -> PromptResult {
     let mut stdout = io::stdout();
     let matcher = SkimMatcherV2::default();
     let max_vis = max_visible();
@@ -52,7 +49,15 @@ pub fn ask_destination(
     let mut prev_drawn_lines: usize = 0;
 
     let matches = compute_matches(&matcher, &input, &dirs);
-    prev_drawn_lines = draw_relative(&mut stdout, input_col, &input, &matches, selected, prev_drawn_lines, max_vis);
+    prev_drawn_lines = draw_relative(
+        &mut stdout,
+        input_col,
+        &input,
+        &matches,
+        selected,
+        prev_drawn_lines,
+        max_vis,
+    );
 
     let result = loop {
         let evt = match event::read() {
@@ -93,7 +98,15 @@ pub fn ask_destination(
                 }
                 selected = 0;
                 let matches = compute_matches(&matcher, &input, &dirs);
-                prev_drawn_lines = draw_relative(&mut stdout, input_col, &input, &matches, selected, prev_drawn_lines, max_vis);
+                prev_drawn_lines = draw_relative(
+                    &mut stdout,
+                    input_col,
+                    &input,
+                    &matches,
+                    selected,
+                    prev_drawn_lines,
+                    max_vis,
+                );
             }
 
             Event::Key(KeyEvent {
@@ -103,17 +116,31 @@ pub fn ask_destination(
                 input.pop();
                 selected = 0;
                 let matches = compute_matches(&matcher, &input, &dirs);
-                prev_drawn_lines = draw_relative(&mut stdout, input_col, &input, &matches, selected, prev_drawn_lines, max_vis);
+                prev_drawn_lines = draw_relative(
+                    &mut stdout,
+                    input_col,
+                    &input,
+                    &matches,
+                    selected,
+                    prev_drawn_lines,
+                    max_vis,
+                );
             }
 
             Event::Key(KeyEvent {
                 code: KeyCode::Up, ..
             }) => {
-                if selected > 0 {
-                    selected -= 1;
-                }
+                selected = selected.saturating_sub(1);
                 let matches = compute_matches(&matcher, &input, &dirs);
-                prev_drawn_lines = draw_relative(&mut stdout, input_col, &input, &matches, selected, prev_drawn_lines, max_vis);
+                prev_drawn_lines = draw_relative(
+                    &mut stdout,
+                    input_col,
+                    &input,
+                    &matches,
+                    selected,
+                    prev_drawn_lines,
+                    max_vis,
+                );
             }
 
             Event::Key(KeyEvent {
@@ -124,7 +151,15 @@ pub fn ask_destination(
                 if !matches.is_empty() && selected < matches.len() - 1 {
                     selected += 1;
                 }
-                prev_drawn_lines = draw_relative(&mut stdout, input_col, &input, &matches, selected, prev_drawn_lines, max_vis);
+                prev_drawn_lines = draw_relative(
+                    &mut stdout,
+                    input_col,
+                    &input,
+                    &matches,
+                    selected,
+                    prev_drawn_lines,
+                    max_vis,
+                );
             }
 
             // Left arrow: go back to previous file
@@ -156,9 +191,12 @@ pub fn ask_destination(
                 let matches = compute_matches(&matcher, &input, &dirs);
                 if !matches.is_empty() && selected < matches.len() {
                     let old_name = matches[selected].0.clone();
-                    if let Some(new_name) = rename_inline(&mut stdout, &old_name, prev_drawn_lines) {
+                    if let Some(new_name) = rename_inline(&mut stdout, &old_name, prev_drawn_lines)
+                    {
                         if !new_name.is_empty() && new_name != old_name {
-                            if let Ok(()) = pifbip_core::rename_subdir(destination, &old_name, &new_name) {
+                            if let Ok(()) =
+                                pifbip_core::rename_subdir(destination, &old_name, &new_name)
+                            {
                                 // Update local dirs list
                                 if let Some(pos) = dirs.iter().position(|d| d == &old_name) {
                                     dirs[pos] = new_name;
@@ -172,7 +210,15 @@ pub fn ask_destination(
                     let _ = write!(stdout, "{}", PROMPT_LABEL);
                     selected = 0;
                     let matches = compute_matches(&matcher, &input, &dirs);
-                    prev_drawn_lines = draw_relative(&mut stdout, input_col, &input, &matches, selected, prev_drawn_lines, max_vis);
+                    prev_drawn_lines = draw_relative(
+                        &mut stdout,
+                        input_col,
+                        &input,
+                        &matches,
+                        selected,
+                        prev_drawn_lines,
+                        max_vis,
+                    );
                 }
             }
 
@@ -184,7 +230,15 @@ pub fn ask_destination(
                 input.push(c);
                 selected = 0;
                 let matches = compute_matches(&matcher, &input, &dirs);
-                prev_drawn_lines = draw_relative(&mut stdout, input_col, &input, &matches, selected, prev_drawn_lines, max_vis);
+                prev_drawn_lines = draw_relative(
+                    &mut stdout,
+                    input_col,
+                    &input,
+                    &matches,
+                    selected,
+                    prev_drawn_lines,
+                    max_vis,
+                );
             }
 
             _ => {}
@@ -294,11 +348,7 @@ fn rename_inline(
     }
 }
 
-fn compute_matches(
-    matcher: &SkimMatcherV2,
-    input: &str,
-    dirs: &[String],
-) -> Vec<(String, i64)> {
+fn compute_matches(matcher: &SkimMatcherV2, input: &str, dirs: &[String]) -> Vec<(String, i64)> {
     if input.is_empty() {
         return dirs.iter().map(|d| (d.clone(), 0)).collect();
     }
@@ -312,7 +362,7 @@ fn compute_matches(
         })
         .collect();
 
-    scored.sort_by(|a, b| b.1.cmp(&a.1));
+    scored.sort_by_key(|b| std::cmp::Reverse(b.1));
     scored
 }
 
@@ -346,9 +396,8 @@ fn draw_relative(
     let has_above = win_start > 0;
     let has_below = win_end < matches.len();
 
-    let drawn_lines = (if has_above { 1 } else { 0 })
-        + visible.len()
-        + (if has_below { 1 } else { 0 });
+    let drawn_lines =
+        (if has_above { 1 } else { 0 }) + visible.len() + (if has_below { 1 } else { 0 });
 
     let total_lines = drawn_lines.max(prev_lines);
 
@@ -397,4 +446,35 @@ fn draw_relative(
     let _ = stdout.flush();
 
     drawn_lines
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn compute_matches_returns_all_dirs_in_original_order_for_empty_input() {
+        let matcher = SkimMatcherV2::default();
+        let dirs = vec![
+            "sports".to_string(),
+            "fruits".to_string(),
+            "instruments".to_string(),
+        ];
+
+        let matches = compute_matches(&matcher, "", &dirs);
+        let names: Vec<String> = matches.into_iter().map(|(name, _)| name).collect();
+        assert_eq!(names, dirs);
+    }
+
+    #[test]
+    fn visible_window_shows_full_list_when_it_fits() {
+        assert_eq!(visible_window(4, 0, 5), (0, 4));
+    }
+
+    #[test]
+    fn visible_window_keeps_selection_near_middle_when_possible() {
+        assert_eq!(visible_window(10, 4, 5), (2, 7));
+        assert_eq!(visible_window(10, 0, 5), (0, 5));
+        assert_eq!(visible_window(10, 9, 5), (5, 10));
+    }
 }
