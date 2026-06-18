@@ -1,0 +1,14 @@
+[package]
+name = "pifbip-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Shared core logic for pifbip: file sorting engine, type detection, and media pipelines"
+
+[dependencies]
+fuzzy-matcher.workspace = true
+mime_guess.workspace = true
+infer.workspace = true
+
+[dev-dependencies]
+tempfile = "3"

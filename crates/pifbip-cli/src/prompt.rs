@@ -158,7 +158,7 @@ pub fn ask_destination(
                     let old_name = matches[selected].0.clone();
                     if let Some(new_name) = rename_inline(&mut stdout, &old_name, prev_drawn_lines) {
                         if !new_name.is_empty() && new_name != old_name {
-                            if let Ok(()) = crate::files::rename_subdir(destination, &old_name, &new_name) {
+                            if let Ok(()) = pifbip_core::rename_subdir(destination, &old_name, &new_name) {
                                 // Update local dirs list
                                 if let Some(pos) = dirs.iter().position(|d| d == &old_name) {
                                     dirs[pos] = new_name;

@@ -1,0 +1,17 @@
+[package]
+name = "pifbip-gui"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Put In Folder By Interactive Prompt — desktop GUI file sorter"
+
+[[bin]]
+name = "pifbip-gui"
+path = "src/main.rs"
+
+[dependencies]
+pifbip-core.workspace = true
+clap.workspace = true
+mime_guess.workspace = true
+iced = { version = "0.13", features = ["image", "tokio", "advanced"] }
+rfd = "0.15"

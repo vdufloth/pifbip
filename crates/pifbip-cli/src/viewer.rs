@@ -1,15 +1,18 @@
-use std::io::Read;
 use std::path::{Path, PathBuf};
-use std::process::{Child, Command, Stdio};
+use std::process::Child;
 use std::sync::mpsc;
 use std::thread;
 
 use image::GenericImageView;
 use minifb::{Window, WindowOptions};
+use pifbip_core::{read_frame_rgb, spawn_ffmpeg, FrameSize};
 
 const WINDOW_WIDTH: usize = 800;
 const WINDOW_HEIGHT: usize = 600;
-const FRAME_BYTES: usize = WINDOW_WIDTH * WINDOW_HEIGHT * 3;
+const FRAME_SIZE: FrameSize = FrameSize {
+    w: WINDOW_WIDTH,
+    h: WINDOW_HEIGHT,
+};
 
 enum ViewerMsg {
     Show(Vec<u32>, usize, usize),
@@ -89,44 +92,16 @@ fn kill_ffmpeg(proc: &mut Option<Child>) {
     }
 }
 
-fn spawn_ffmpeg(path: &Path) -> Option<Child> {
-    Command::new("ffmpeg")
-        .args([
-            "-i", &path.to_string_lossy(),
-            "-f", "rawvideo",
-            "-pix_fmt", "rgb24",
-            "-s", &format!("{}x{}", WINDOW_WIDTH, WINDOW_HEIGHT),
-            "-v", "quiet",
-            "-",
-        ])
-        .stdin(Stdio::null())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::null())
-        .spawn()
-        .ok()
-}
-
-fn read_frame(child: &mut Child) -> Option<Vec<u32>> {
-    let stdout = child.stdout.as_mut()?;
-    let mut rgb_buf = vec![0u8; FRAME_BYTES];
-
-    let mut read = 0;
-    while read < FRAME_BYTES {
-        match stdout.read(&mut rgb_buf[read..]) {
-            Ok(0) => return None, // EOF — video ended
-            Ok(n) => read += n,
-            Err(_) => return None,
-        }
-    }
-
+/// Read one rgb24 frame from ffmpeg and pack it into a minifb `u32` buffer.
+fn next_frame_packed(child: &mut Child) -> Option<Vec<u32>> {
+    let rgb = read_frame_rgb(child, FRAME_SIZE)?;
     let mut buffer = vec![0u32; WINDOW_WIDTH * WINDOW_HEIGHT];
-    for i in 0..buffer.len() {
-        let r = rgb_buf[i * 3] as u32;
-        let g = rgb_buf[i * 3 + 1] as u32;
-        let b = rgb_buf[i * 3 + 2] as u32;
-        buffer[i] = (r << 16) | (g << 8) | b;
+    for (i, px) in buffer.iter_mut().enumerate() {
+        let r = rgb[i * 3] as u32;
+        let g = rgb[i * 3 + 1] as u32;
+        let b = rgb[i * 3 + 2] as u32;
+        *px = (r << 16) | (g << 8) | b;
     }
-
     Some(buffer)
 }
 
@@ -164,7 +139,7 @@ fn run_window(rx: mpsc::Receiver<ViewerMsg>) {
             }
             Ok(ViewerMsg::PlayVideo(path)) => {
                 kill_ffmpeg(&mut ffmpeg_proc);
-                ffmpeg_proc = spawn_ffmpeg(&path);
+                ffmpeg_proc = spawn_ffmpeg(&path, FRAME_SIZE);
                 video_path = Some(path);
                 buffer = vec![0u32; WINDOW_WIDTH * WINDOW_HEIGHT];
             }
@@ -186,7 +161,7 @@ fn run_window(rx: mpsc::Receiver<ViewerMsg>) {
 
         // If playing video, try to read next frame
         if let Some(ref mut child) = ffmpeg_proc {
-            match read_frame(child) {
+            match next_frame_packed(child) {
                 Some(frame) => {
                     buffer = frame;
                 }
@@ -194,7 +169,7 @@ fn run_window(rx: mpsc::Receiver<ViewerMsg>) {
                     // Video ended — loop by respawning ffmpeg
                     kill_ffmpeg(&mut ffmpeg_proc);
                     if let Some(ref path) = video_path {
-                        ffmpeg_proc = spawn_ffmpeg(path);
+                        ffmpeg_proc = spawn_ffmpeg(path, FRAME_SIZE);
                     }
                 }
             }

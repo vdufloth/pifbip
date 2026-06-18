@@ -1,15 +1,16 @@
-[package]
-name = "pifbip"
+[workspace]
+resolver = "2"
+members = ["crates/pifbip-core", "crates/pifbip-cli", "crates/pifbip-gui"]
+
+[workspace.package]
 version = "0.1.0"
 edition = "2021"
+license = "MIT"
 description = "Put In Folder By Interactive Prompt — fast manual file sorting with preview and autocomplete"
 
-[dependencies]
+[workspace.dependencies]
+pifbip-core = { path = "crates/pifbip-core" }
 clap = { version = "4", features = ["derive"] }
-crossterm = "0.28"
 fuzzy-matcher = "0.3"
-viuer = "0.8"
-image = { version = "0.25", default-features = false, features = ["jpeg", "png", "gif", "webp", "bmp", "tiff", "ico"] }
 mime_guess = "2"
 infer = "0.19"
-minifb = "0.28"

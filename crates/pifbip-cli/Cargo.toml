@@ -1,0 +1,20 @@
+[package]
+name = "pifbip-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Put In Folder By Interactive Prompt — terminal file sorter"
+
+[[bin]]
+name = "pifbip-cli"
+path = "src/main.rs"
+
+[dependencies]
+pifbip-core.workspace = true
+clap.workspace = true
+mime_guess.workspace = true
+crossterm = "0.28"
+fuzzy-matcher.workspace = true
+viuer = "0.8"
+image = { version = "0.25", default-features = false, features = ["jpeg", "png", "gif", "webp", "bmp", "tiff", "ico"] }
+minifb = "0.28"
