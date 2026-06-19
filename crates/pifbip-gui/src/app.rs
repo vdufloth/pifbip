@@ -14,12 +14,24 @@ use crate::video::{VideoStream, VIDEO_H, VIDEO_W};
 
 const TEXT_PREVIEW_BYTES: u64 = 64 * 1024;
 const MAX_SUGGESTIONS: usize = 12;
+/// Fixed height of a file-list row, so we can scroll the current file to the top.
+const ROW_H: f32 = 22.0;
+
+/// The embedded 8-bit logo font (Press Start 2P, OFL).
+pub const PIXEL_FONT: Font = Font::with_name("Press Start 2P");
 
 // Brand assets, embedded so the binary is self-contained.
-const WORDMARK_SVG: &[u8] = include_bytes!("../assets/pifbip-wordmark.svg");
 const ICON_BACK_SVG: &[u8] = include_bytes!("../assets/icon-back.svg");
 const ICON_SKIP_SVG: &[u8] = include_bytes!("../assets/icon-skip.svg");
 const ICON_MOVE_SVG: &[u8] = include_bytes!("../assets/icon-move.svg");
+
+fn files_scroll_id() -> scrollable::Id {
+    scrollable::Id::new("file-list")
+}
+
+fn input_id() -> text_input::Id {
+    text_input::Id::new("subfolder-input")
+}
 
 #[derive(Clone)]
 pub struct Flags {
@@ -37,6 +49,7 @@ pub enum Message {
     BrowseOrigin,
     BrowseDestination,
     Start,
+    BackToSetup,
     // Sorting screen
     InputChanged(String),
     Confirm,
@@ -132,25 +145,30 @@ impl App {
                     self.screen = Screen::Sorting;
                     self.setup_error = None;
                     self.refresh();
+                    return self.after_nav();
                 }
                 Err(e) => self.setup_error = Some(e),
             },
+            Message::BackToSetup => {
+                self.cleanup_preview();
+                self.screen = Screen::Setup;
+            }
             Message::InputChanged(s) => {
                 self.input = s;
                 self.selected = 0;
                 self.recompute_suggestions();
             }
-            Message::Confirm => self.do_confirm(),
-            Message::Skip => self.do_skip(),
-            Message::GoBack => self.do_goback(),
+            Message::Confirm => return self.do_confirm(),
+            Message::Skip => return self.do_skip(),
+            Message::GoBack => return self.do_goback(),
             Message::ArrowLeft => {
                 if self.input.is_empty() {
-                    self.do_goback();
+                    return self.do_goback();
                 }
             }
             Message::ArrowRight => {
                 if self.input.is_empty() {
-                    self.do_skip();
+                    return self.do_skip();
                 }
             }
             Message::SuggestionUp => self.selected = self.selected.saturating_sub(1),
@@ -165,6 +183,7 @@ impl App {
                     self.selected = 0;
                     self.recompute_suggestions();
                 }
+                return text_input::focus(input_id());
             }
             Message::SelectSuggestion(i) => {
                 if let Some(sug) = self.suggestions.get(i).cloned() {
@@ -172,6 +191,7 @@ impl App {
                     self.selected = 0;
                     self.recompute_suggestions();
                 }
+                return text_input::focus(input_id());
             }
             Message::Tick => {
                 if let Some(v) = &self.video {
@@ -221,9 +241,10 @@ impl App {
 
     fn setup_view(&self) -> Element<'_, Message> {
         let mut col = column![
-            svg(svg::Handle::from_memory(WORDMARK_SVG))
-                .width(Length::Fixed(260.0))
-                .height(Length::Fixed(55.0)),
+            text("Pifbip")
+                .font(PIXEL_FONT)
+                .size(44)
+                .color(theme::PRIMARY),
             text("Sort files into folders, with previews.").size(14),
             Space::with_height(12),
             labeled_folder(
@@ -276,18 +297,19 @@ impl App {
         };
         let p = session.progress();
 
-        // File list with the current file highlighted.
-        let mut list = column![].spacing(2);
+        // File list with the current file highlighted. Rows are a fixed height
+        // so the list can be scrolled to put the current file exactly on top.
+        let mut list = column![];
         for (i, name) in session.file_names().into_iter().enumerate() {
             let label = text(name).size(13);
+            let cell = container(label)
+                .padding([2, 6])
+                .width(Length::Fill)
+                .height(Length::Fixed(ROW_H));
             let rowel: Element<Message> = if i == p.index {
-                container(label)
-                    .padding([2, 6])
-                    .width(Length::Fill)
-                    .style(theme::selected_row)
-                    .into()
+                cell.style(theme::selected_row).into()
             } else {
-                container(label).padding([2, 6]).width(Length::Fill).into()
+                cell.into()
             };
             list = list.push(rowel);
         }
@@ -304,14 +326,22 @@ impl App {
             );
         }
 
-        let header = text(format!(
-            "[{}/{}]  moved {}  skipped {}",
-            (p.index + 1).min(p.total),
-            p.total,
-            p.moved,
-            p.skipped
-        ))
-        .size(14);
+        let header = row![
+            text(format!(
+                "[{}/{}]  moved {}  skipped {}",
+                (p.index + 1).min(p.total),
+                p.total,
+                p.moved,
+                p.skipped
+            ))
+            .size(14),
+            Space::with_width(Length::Fill),
+            button(text("Folders").size(12))
+                .on_press(Message::BackToSetup)
+                .padding([4, 8])
+                .style(theme::neutral_button),
+        ]
+        .align_y(iced::Alignment::Center);
 
         let controls = row![
             icon_button(ICON_BACK_SVG, "Back", theme::TEXT, Message::GoBack)
@@ -326,10 +356,11 @@ impl App {
         let left = container(
             column![
                 header,
-                container(scrollable(list))
+                container(scrollable(list).id(files_scroll_id()))
                     .height(Length::FillPortion(3))
                     .width(Length::Fill),
                 text_input("subfolder name (empty = skip)", &self.input)
+                    .id(input_id())
                     .on_input(Message::InputChanged)
                     .on_submit(Message::Confirm)
                     .padding(8),
@@ -415,7 +446,7 @@ impl App {
 
     // --- actions -----------------------------------------------------------
 
-    fn do_confirm(&mut self) {
+    fn do_confirm(&mut self) -> Task<Message> {
         let trimmed = self.input.trim().to_string();
         let outcome = self.session.as_mut().map(|s| {
             if trimmed.is_empty() {
@@ -428,21 +459,43 @@ impl App {
             self.status = describe_outcome(&o);
             self.refresh();
         }
+        self.after_nav()
     }
 
-    fn do_skip(&mut self) {
+    fn do_skip(&mut self) -> Task<Message> {
         let outcome = self.session.as_mut().map(|s| s.skip());
         if let Some(o) = outcome {
             self.status = describe_outcome(&o);
             self.refresh();
         }
+        self.after_nav()
     }
 
-    fn do_goback(&mut self) {
+    fn do_goback(&mut self) -> Task<Message> {
         let outcome = self.session.as_mut().map(|s| s.go_back());
         if let Some(o) = outcome {
             self.status = describe_outcome(&o);
             self.refresh();
+        }
+        self.after_nav()
+    }
+
+    /// Keep the current file scrolled to the top of the list and the subfolder
+    /// input focused, so rapid keyboard sorting stays usable.
+    fn after_nav(&self) -> Task<Message> {
+        Task::batch([self.scroll_to_current(), text_input::focus(input_id())])
+    }
+
+    fn scroll_to_current(&self) -> Task<Message> {
+        match &self.session {
+            Some(s) => scrollable::scroll_to(
+                files_scroll_id(),
+                scrollable::AbsoluteOffset {
+                    x: 0.0,
+                    y: s.index() as f32 * ROW_H,
+                },
+            ),
+            None => Task::none(),
         }
     }
 

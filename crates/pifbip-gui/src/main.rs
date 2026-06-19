@@ -34,5 +34,6 @@ fn main() -> iced::Result {
     iced::application("pifbip — file sorter", App::update, App::view)
         .theme(|_state| theme::theme())
         .subscription(App::subscription)
+        .font(include_bytes!("../assets/PressStart2P-Regular.ttf").as_slice())
         .run_with(move || App::new(flags.clone()))
 }
