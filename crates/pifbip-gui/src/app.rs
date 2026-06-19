@@ -2,7 +2,9 @@
 
 use std::path::{Path, PathBuf};
 
-use iced::widget::{button, column, container, image, row, scrollable, text, text_input, Space};
+use iced::widget::{
+    button, column, container, image, row, scrollable, svg, text, text_input, Space,
+};
 use iced::{ContentFit, Element, Font, Length, Subscription, Task};
 
 use pifbip_core::{format_size, render_pdf_page, FileKind, Outcome, SortSession};
@@ -12,6 +14,12 @@ use crate::video::{VideoStream, VIDEO_H, VIDEO_W};
 
 const TEXT_PREVIEW_BYTES: u64 = 64 * 1024;
 const MAX_SUGGESTIONS: usize = 12;
+
+// Brand assets, embedded so the binary is self-contained.
+const WORDMARK_SVG: &[u8] = include_bytes!("../assets/pifbip-wordmark.svg");
+const ICON_BACK_SVG: &[u8] = include_bytes!("../assets/icon-back.svg");
+const ICON_SKIP_SVG: &[u8] = include_bytes!("../assets/icon-skip.svg");
+const ICON_MOVE_SVG: &[u8] = include_bytes!("../assets/icon-move.svg");
 
 #[derive(Clone)]
 pub struct Flags {
@@ -213,7 +221,9 @@ impl App {
 
     fn setup_view(&self) -> Element<'_, Message> {
         let mut col = column![
-            text("pifbip").size(34),
+            svg(svg::Handle::from_memory(WORDMARK_SVG))
+                .width(Length::Fixed(260.0))
+                .height(Length::Fixed(55.0)),
             text("Sort files into folders, with previews.").size(14),
             Space::with_height(12),
             labeled_folder(
@@ -247,7 +257,8 @@ impl App {
         col = col.push(
             button(text("Start sorting"))
                 .on_press(Message::Start)
-                .padding([8, 16]),
+                .padding([8, 16])
+                .style(theme::primary_button),
         );
 
         container(col)
@@ -284,17 +295,12 @@ impl App {
         // Suggestions (fuzzy-ranked), selected one highlighted.
         let mut sugg = column![].spacing(2);
         for (i, name) in self.suggestions.iter().take(MAX_SUGGESTIONS).enumerate() {
-            let style = if i == self.selected {
-                button::primary
-            } else {
-                button::secondary
-            };
             sugg = sugg.push(
                 button(text(name.clone()).size(13))
                     .on_press(Message::SelectSuggestion(i))
                     .width(Length::Fill)
                     .padding([3, 6])
-                    .style(style),
+                    .style(theme::suggestion(i == self.selected)),
             );
         }
 
@@ -308,16 +314,12 @@ impl App {
         .size(14);
 
         let controls = row![
-            button(text("← Back"))
-                .on_press(Message::GoBack)
-                .padding([6, 10]),
-            button(text("Skip →"))
-                .on_press(Message::Skip)
-                .padding([6, 10]),
-            button(text("Move"))
-                .on_press(Message::Confirm)
-                .padding([6, 10])
-                .style(button::success),
+            icon_button(ICON_BACK_SVG, "Back", theme::TEXT, Message::GoBack)
+                .style(theme::neutral_button),
+            icon_button(ICON_SKIP_SVG, "Skip", theme::TEXT, Message::Skip)
+                .style(theme::neutral_button),
+            icon_button(ICON_MOVE_SVG, "Move", theme::BACKGROUND, Message::Confirm)
+                .style(theme::primary_button),
         ]
         .spacing(8);
 
@@ -586,9 +588,32 @@ fn labeled_folder<'a>(
         text_input("full path…", value)
             .on_input(on_input)
             .width(Length::Fill),
-        button(text("Browse…")).on_press(on_browse).padding([6, 10]),
+        button(text("Browse…"))
+            .on_press(on_browse)
+            .padding([6, 10])
+            .style(theme::neutral_button),
     ]
     .spacing(8)
     .align_y(iced::Alignment::Center)
     .into()
+}
+
+/// A button with a tinted icon SVG and a text label.
+fn icon_button<'a>(
+    icon_bytes: &'static [u8],
+    label: &'a str,
+    tint: iced::Color,
+    on_press: Message,
+) -> button::Button<'a, Message> {
+    let glyph = svg(svg::Handle::from_memory(icon_bytes))
+        .width(Length::Fixed(14.0))
+        .height(Length::Fixed(14.0))
+        .style(theme::icon(tint));
+    button(
+        row![glyph, text(label)]
+            .spacing(6)
+            .align_y(iced::Alignment::Center),
+    )
+    .on_press(on_press)
+    .padding([6, 12])
 }
