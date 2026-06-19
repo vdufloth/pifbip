@@ -1,5 +1,5 @@
 //! Dark theme matching the GNOME terminal default grey (#2E3436), with the
-//! pifbip brand colors: primary #FF3C00 (orange-red), secondary #00C3FF (cyan).
+//! pifbip brand primary #FF3C00 (orange-red) and a light-grey selection accent.
 
 use iced::widget::{button, svg};
 use iced::{Background, Border, Color, Theme};
@@ -15,8 +15,8 @@ pub const SURFACE: Color = rgb(0x3A, 0x41, 0x43);
 pub const TEXT: Color = rgb(0xD3, 0xD7, 0xCF);
 /// Brand primary — orange-red.
 pub const PRIMARY: Color = rgb(0xFF, 0x3C, 0x00);
-/// Brand secondary — cyan.
-pub const SECONDARY: Color = rgb(0x00, 0xC3, 0xFF);
+/// Light-grey selection accent (used to highlight the chosen suggestion).
+pub const SELECTION: Color = rgb(0x6B, 0x74, 0x76);
 pub const DANGER: Color = rgb(0xCC, 0x00, 0x00);
 
 /// The custom dark theme used by the whole application.
@@ -27,7 +27,7 @@ pub fn theme() -> Theme {
             background: BACKGROUND,
             text: TEXT,
             primary: PRIMARY,
-            success: SECONDARY,
+            success: PRIMARY,
             danger: DANGER,
         },
     )
@@ -85,11 +85,11 @@ fn flat_button(bg: Color, fg: Color, status: button::Status) -> button::Style {
     }
 }
 
-/// A suggestion row: cyan (secondary) when selected, surface otherwise.
+/// A suggestion row: light grey when selected, surface otherwise.
 pub fn suggestion(selected: bool) -> impl Fn(&Theme, button::Status) -> button::Style {
     move |_t, status| {
         if selected {
-            flat_button(SECONDARY, BACKGROUND, status)
+            flat_button(SELECTION, TEXT, status)
         } else {
             flat_button(SURFACE, TEXT, status)
         }

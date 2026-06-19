@@ -364,6 +364,7 @@ impl App {
                     .on_input(Message::InputChanged)
                     .on_submit(Message::Confirm)
                     .padding(8),
+                key_hint(),
                 container(scrollable(sugg)).height(Length::FillPortion(2)),
                 controls,
                 text(self.status.clone()).size(12).color(theme::PRIMARY),
@@ -431,9 +432,17 @@ impl App {
             column![
                 text("All done!").size(30),
                 text(summary).size(15),
-                button(text("Quit"))
-                    .on_press(Message::Quit)
-                    .padding([8, 16]),
+                row![
+                    button(text("Select another folder"))
+                        .on_press(Message::BackToSetup)
+                        .padding([8, 16])
+                        .style(theme::neutral_button),
+                    button(text("Quit"))
+                        .on_press(Message::Quit)
+                        .padding([8, 16])
+                        .style(theme::primary_button),
+                ]
+                .spacing(12),
             ]
             .spacing(16)
             .align_x(iced::Alignment::Center),
@@ -648,6 +657,23 @@ fn labeled_folder<'a>(
     ]
     .spacing(8)
     .align_y(iced::Alignment::Center)
+    .into()
+}
+
+/// Keybinding hint shown under the subfolder input.
+fn key_hint<'a>() -> Element<'a, Message> {
+    let muted = iced::Color {
+        a: 0.6,
+        ..theme::TEXT
+    };
+    column![
+        text("Enter — move to the typed name").size(11).color(muted),
+        text("Tab — use the highlighted suggestion")
+            .size(11)
+            .color(muted),
+        text("Up / Down — change selection").size(11).color(muted),
+    ]
+    .spacing(1)
     .into()
 }
 
